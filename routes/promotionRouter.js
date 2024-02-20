@@ -1,10 +1,11 @@
 const express = require('express');
 const Promotion = require('../models/promotion');
+const authenticate = require('../authenticate');
 
 const promotionRouter = express.Router();
 
 promotionRouter.route('/')
-    .get((req, res, next) => {
+    .get((req, res) => {
         Promotion.find()
             .then(promotions => {
                 res.statusCode = 200;
@@ -13,28 +14,41 @@ promotionRouter.route('/')
             })
             .catch(err => next(err));
     })
-    .post((req, res, next) => {
-        Promotion.create(req.body)
-            .then(promotion => {
-                console.log('Promotion Created ', promotion);
-                res.statusCode = 200;
-                res.setHeader('Content-Type', 'application/json');
-                res.json(promotion);
-            })
-            .catch(err => next(err));
+
+    .post(authenticate.verifyUser, (req, res) => {
+        if (req.user.admin) {
+            Promotion.create(req.body)
+                .then(promotion => {
+                    console.log('Promotion Created ', promotion);
+                    res.statusCode = 200;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.json(promotion);
+                })
+                .catch(err => next(err));
+        } else {
+            res.statusCode = 403;
+            res.end("You are not authorized to perform this operation!");
+        }
     })
-    .put((req, res) => {
+
+    .put(authenticate.verifyUser, (req, res) => {
         res.statusCode = 403;
         res.end('PUT operation not supported on /promotions');
     })
-    .delete((req, res, next) => {
-        Promotion.deleteMany()
-            .then(response => {
-                res.statusCode = 200;
-                res.setHeader('Content-Type', 'application/json');
-                res.json(response);
-            })
-            .catch(err => next(err));
+
+    .delete(authenticate.verifyUser, (req, res) => {
+        if (req.user.admin) {
+            Promotion.deleteMany()
+                .then(response => {
+                    res.statusCode = 200;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.json(response);
+                })
+                .catch(err => next(err));
+        } else {
+            res.statusCode = 403;
+            res.end("You are not authorized to perform this operation!");
+        }
     });
 
 promotionRouter.route('/:promotionId')
@@ -47,29 +61,41 @@ promotionRouter.route('/:promotionId')
             })
             .catch(err => next(err));
     })
-    .post((req, res) => {
+    .post(authenticate.verifyUser, (req, res) => {
         res.statusCode = 403;
         res.end(`POST operation not supported on /promotions/${req.params.promotionId}`);
     })
-    .put((req, res, next) => {
-        Promotion.findByIdAndUpdate(req.params.promotionId, {
-            $set: req.body
-        }, { new: true })
-            .then(promotion => {
-                res.statusCode = 200;
-                res.setHeader('Content-Type', 'application/json');
-                res.json(promotion);
-            })
-            .catch(err => next(err));
+
+    .put(authenticate.verifyUser, (req, res) => {
+        if (req.user.admin) {
+            Promotion.findByIdAndUpdate(req.params.promotionId, {
+                $set: req.body
+            }, { new: true })
+                .then(promotion => {
+                    res.statusCode = 200;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.json(promotion);
+                })
+                .catch(err => next(err));
+        } else {
+            res.statusCode = 403;
+            res.end("You are not authorized to perform this operation!");
+        }
     })
-    .delete((req, res, next) => {
-        Promotion.findByIdAndDelete(req.params.promotionId)
-            .then(response => {
-                res.statusCode = 200;
-                res.setHeader('Content-Type', 'application/json');
-                res.json(response);
-            })
-            .catch(err => next(err));
+
+    .delete(authenticate.verifyUser, (req, res) => {
+        if (req.user.admin) {
+            Promotion.findByIdAndDelete(req.params.promotionId)
+                .then(response => {
+                    res.statusCode = 200;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.json(response);
+                })
+                .catch(err => next(err));
+        } else {
+            res.statusCode = 403;
+            res.end("You are not authorized to perform this operation!");
+        }
     });
 
 module.exports = promotionRouter;
