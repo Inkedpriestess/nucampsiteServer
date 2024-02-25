@@ -18,6 +18,7 @@ favoriteRouter.route('/')
             })
             .catch(err => next(err))
     })
+
     .post(cors.corsWithOptions, authenticate.verifyUser, (req, res, next) => {
         Favorite.findOne({ user: req.user._id })
             .then(favorite => {
@@ -28,7 +29,7 @@ favoriteRouter.route('/')
                         }
                     });
                     favorite.save()
-                        .then(favorite => {
+                        .then(favorites => {
                             res.statusCode = 200;
                             res.setHeader('Content-Type', 'application/json');
                             res.json(favorites);
@@ -36,7 +37,7 @@ favoriteRouter.route('/')
                         .catch(err => next(err));
                 } else {
                     Favorite.create({ user: req.user._id, campsites: req.body })
-                        .then(favorite => {
+                        .then(favorites => {
                             res.statusCode = 200;
                             res.setHeader('Content-Type', 'application/json');
                             res.json(favorites);
@@ -45,7 +46,6 @@ favoriteRouter.route('/')
             })
             .catch(err => next(err));
     })
-
 
     .put(cors.corsWithOptions, authenticate.verifyUser, (req, res) => {
         res.statusCode = 403;
@@ -68,6 +68,7 @@ favoriteRouter.route('/:campsiteId')
         res.statusCode = 403;
         res.end(`PUT operation not supported on /favorites/${re.params.camsiteId}`);
     })
+
     .post(cors.corsWithOptions, authenticate.verifyUser, (req, res, next) => {
         Favorite.findOne({ user: req.user._id })
             .then(favorite => {
@@ -83,12 +84,22 @@ favoriteRouter.route('/:campsiteId')
                             .catch(err => next(err));
                     } else {
                         res.statusCode = 200;
-                        res.setHeader('Content-Type', 'application/json');
-                        res.json(favorite);
+                        res.setHeader('Content-Type', 'text/plain');
+                        res.end('That campsite is already a favorite!');
                     }
+                } else {
+                    Favorite.create({ user: req.user._id, campsites: [req.params.campsiteId] })
+                        .then(favorite => {
+                            res.statusCode = 200;
+                            res.setHeader('Content-Type', 'application/json');
+                            res.json(favorite);
+                        })
+                        .catch(err => next(err));
                 }
             })
+            .catch(err => next(err));
     })
+
     .put(cors.corsWithOptions, authenticate.verifyUser, (req, res) => {
         res.statusCode = 403;
         res.end('PUT operation not supported on /campsites');
@@ -98,9 +109,9 @@ favoriteRouter.route('/:campsiteId')
         Favorite.findOne({ user: req.user._id })
             .then(favorite => {
                 if (favorite) {
-                    const index = favorite.campsites.indexof(req.params.campsiteId);
+                    const index = favorite.campsites.indexOf(req.params.campsiteId);
                     if (index !== -1) {
-                        favorite.campsite.splice(index, 1);
+                        favorite.campsites.splice(index, 1);
                         favorite.save()
                             .then(favorite => {
                                 res.statusCode = 200;
@@ -120,7 +131,6 @@ favoriteRouter.route('/:campsiteId')
                 }
             })
             .catch(err => next(err));
-
     });
 
 module.exports = favoriteRouter;
