@@ -7,107 +7,120 @@ const favoriteRouter = express.Router();
 
 favoriteRouter.route('/')
     .options(cors.corsWithOptions, (req, res) => res.sendStatus(200))
-    .get(cors.cors, (req, res, next) => {
-        Favorite.find()
-            .then(favoritess => {
+    .get(cors.cors, authenticate.verifyUser, (req, res, next) => {
+        Favorite.find({ user: req.user._id })
+            .populate('user')
+            .populate('campsites')
+            .then(favorites => {
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'application/json');
                 res.json(favorites);
             })
-            .catch(err => next(err));
+            .catch(err => next(err))
     })
-    //ability to add a favorite campsite
-    // .post(cors.corsWithOptions,authenticate.verifyUser, authenticate.verifyAdmin, upload.single('imageFile'), (req, res) => {
-    //     res.statusCode = 200;
-    //     res.setHeader('Content-Type', 'application/json');
-    //     res.json(req.file);
-    // })
-    .post(cors.corsWithOptions, authenticate.verifyUser, authenticate.verifyAdmin, (req, res, next) => {
-        Campsite.findById(req.params.campsiteId)
-            .then(campsite => {
-                if (campsite) {
-                    req.body.author = req.user._id;
-                    campsite.comments.push(req.body);
-                    campsite.save()
-                        .then(campsite => {
+    .post(cors.corsWithOptions, authenticate.verifyUser, (req, res, next) => {
+        Favorite.findOne({ user: req.user._id })
+            .then(favorite => {
+                if (favorite) {
+                    req.body.forEach(campsite => {
+                        if (!favorite.campsites.includes(campsite._id)) {
+                            favorite.campsites.push(campsite._id);
+                        }
+                    });
+                    favorite.save()
+                        .then(favorite => {
                             res.statusCode = 200;
                             res.setHeader('Content-Type', 'application/json');
-                            res.json(campsite);
+                            res.json(favorites);
                         })
                         .catch(err => next(err));
                 } else {
-                    err = new Error(`Campsite ${req.params.campsiteId} not found`);
-                    err.status = 404;
-                    return next(err);
+                    Favorite.create({ user: req.user._id, campsites: req.body })
+                        .then(favorite => {
+                            res.statusCode = 200;
+                            res.setHeader('Content-Type', 'application/json');
+                            res.json(favorites);
+                        })
                 }
             })
             .catch(err => next(err));
     })
-    .put(cors.corsWithOptions, authenticate.verifyUser, authenticate.verifyAdmin, (req, res) => {
+
+
+    .put(cors.corsWithOptions, authenticate.verifyUser, (req, res) => {
         res.statusCode = 403;
         res.end('PUT operation not supported on /favorites');
     })
 
-    .delete(cors.corsWithOptions, authenticate.verifyUser, authenticate.verifyAdmin, (req, res, next) => {
-        if (req.user.admin) {
-            Favorite.deleteMany()
-                .then(response => {
-                    res.statusCode = 200;
-                    res.setHeader('Content-Type', 'application/json');
-                    res.json(response);
-                })
-                .catch(err => next(err));
-        } else {
-            res.statusCode = 403;
-            res.end("You are not authorized to perform this operation!");
-        }
-    });
-
-favoriteRouter.route('/:favoriteId')
-    .options(cors.corsWithOptions, (req, res) => res.sendStatus(200))
-    .get(cors.cors, (req, res, next) => {
-        Favorite.findById(req.params.favoriteId)
-            .then(favorite => {
+    .delete(cors.corsWithOptions, authenticate.verifyUser, (req, res, next) => {
+        Favorite.findOneAndDelete({ user: req.user._id })
+            .then(response => {
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'application/json');
-                res.json(favorite);
+                res.json(response);
             })
             .catch(err => next(err));
+    });
+
+favoriteRouter.route('/:campsiteId')
+    .options(cors.corsWithOptions, (req, res) => res.sendStatus(200))
+    .get(cors.cors, authenticate.verifyUser, (req, res) => {
+        res.statusCode = 403;
+        res.end(`PUT operation not supported on /favorites/${re.params.camsiteId}`);
     })
-    .post(cors.corsWithOptions, authenticate.verifyUser, authenticate.verifyAdmin, (req, res) => {
-        res.end(`POST operation not supported on /favorites/${req.params.favoriteId}`);
+    .post(cors.corsWithOptions, authenticate.verifyUser, (req, res, next) => {
+        Favorite.findOne({ user: req.user._id })
+            .then(favorite => {
+                if (favorite) {
+                    if (!favorite.campsites.includes(req.params.campsiteId)) {
+                        favorite.campsites.push(req.params.campsiteId);
+                        favorite.save()
+                            .then(favorite => {
+                                res.statusCode = 200;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.json(favorite);
+                            })
+                            .catch(err => next(err));
+                    } else {
+                        res.statusCode = 200;
+                        res.setHeader('Content-Type', 'application/json');
+                        res.json(favorite);
+                    }
+                }
+            })
+    })
+    .put(cors.corsWithOptions, authenticate.verifyUser, (req, res) => {
+        res.statusCode = 403;
+        res.end('PUT operation not supported on /campsites');
     })
 
-    .put(cors.corsWithOptions, authenticate.verifyUser, authenticate.verifyAdmin, (req, res, next) => {
-        if (req.user.admin) {
-            Favorite.findByIdAndUpdate(req.params.favoriteId, {
-                $set: req.body
-            }, { new: true })
-                .then(favorite => {
+    .delete(cors.corsWithOptions, authenticate.verifyUser, (req, res, next) => {
+        Favorite.findOne({ user: req.user._id })
+            .then(favorite => {
+                if (favorite) {
+                    const index = favorite.campsites.indexof(req.params.campsiteId);
+                    if (index !== -1) {
+                        favorite.campsite.splice(index, 1);
+                        favorite.save()
+                            .then(favorite => {
+                                res.statusCode = 200;
+                                res.setHeader('Content-Type', 'application/json');
+                                res.json(favorite);
+                            })
+                            .catch(err => next(err));
+                    } else {
+                        res.statusCode = 200;
+                        res.setHeader('Content-Type', 'text/plain');
+                        res.end('Campsite not found in favorites');
+                    }
+                } else {
                     res.statusCode = 200;
-                    res.setHeader('Content-Type', 'application/json');
-                    res.json(favorite);
-                })
-                .catch(err => next(err));
-        } else {
-            res.statusCode = 403;
-            res.end("You are not authorized to perform this operation!");
-        }
-    })
+                    res.setHeader('Content-Type', 'text/plain');
+                    res.end('There are no favorites to delete');
+                }
+            })
+            .catch(err => next(err));
 
-    .delete(cors.corsWithOptions, authenticate.verifyUser, authenticate.verifyAdmin, (req, res, next) => {
-        if (req.user.admin) {
-            Favorite.findByIdAndDelete(req.params.favoriteId)
-                .then(response => {
-                    res.statusCode = 200;
-                    res.setHeader('Content-Type', 'application/json');
-                    res.json(response);
-                })
-                .catch(err => next(err));
-        } else {
-            res.statusCode = 403;
-            res.end("You are not authorized to perform this operation!");
-        }
     });
 
 module.exports = favoriteRouter;
